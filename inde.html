@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Школьный журнал</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 50px auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); position: relative; }
+    h1, h2 { text-align: center; margin: 0 0 20px; }
+    form { display: flex; flex-direction: column; }
+    form div { margin-bottom: 15px; }
+    label { margin-bottom: 5px; font-weight: bold; }
+    input, select, textarea, button, a.join-link { padding: 10px; border: 1px solid #ccc; border-radius: 4px; text-decoration: none; text-align: center; display: inline-block; }
+    button { background: #007BFF; color: #fff; cursor: pointer; }
+    button:hover, a.join-link:hover { background: #0056b3; color: #fff; }
+    .hidden { display: none; }
+    .nav { display: flex; justify-content: center; margin-bottom: 20px; }
+    .nav button { margin: 0 10px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background: #007BFF; color: white; }
+    .error { color: red; font-size: 0.9em; }
+    .join-container { text-align: center; margin: 15px 0; }
+    .sticker { position: absolute; top: -20px; right: -20px; width: 100px; opacity: 0.8; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <img src="https://i.imgur.com/1Q9Z1ZL.png" alt="Стикер сердечек" class="sticker" />
+    <h1>Школьный журнал</h1>
+
+    <div id="authPage">
+      <h2>Вход / Регистрация</h2>
+      <form id="authForm">
+        <div>
+          <label for="userRole">Выберите роль</label>
+          <select id="userRole">
+            <option value="teacher">Учитель</option>
+            <option value="student">Ученик</option>
+            <option value="director">Директор</option>
+          </select>
+        </div>
+        <div>
+          <label for="username">Имя пользователя</label>
+          <input type="text" id="username" required />
+        </div>
+        <div>
+          <label for="password">Пароль</label>
+          <input type="password" id="password" required />
+        </div>
+        <button type="submit">Войти / Зарегистрироваться</button>
+        <div id="authError" class="error"></div>
+      </form>
+    </div>
+
+    <div id="mainPage" class="hidden">
+      <div class="nav">
+        <button id="teacherTab" class="hidden">Учитель</button>
+        <button id="studentTab" class="hidden">Ученик</button>
+        <button id="directorTab" class="hidden">Директор</button>
+      </div>
+
+      <div id="teacherPage" class="hidden">
+        <h2>Журнал учителя</h2>
+        <div class="join-container">
+          <a href="https://t.me/+fdGMA-3ZAq9hYjli" target="_blank" class="join-link">Присоединиться к уроку</a>
+        </div>
+        <form id="teacherForm">
+          <div>
+            <label for="studentName">Имя ученика</label>
+            <input type="text" id="studentName" required />
+          </div>
+          <div>
+            <label for="grade">Оценка</label>
+            <input type="text" id="grade" required />
+          </div>
+          <div>
+            <label for="homework">Домашнее задание</label>
+            <textarea id="homework" required></textarea>
+          </div>
+          <button type="submit">Сохранить запись</button>
+        </form>
+        <table>
+          <thead>
+            <tr><th>Ученик</th><th>Оценка</th><th>Домашнее задание</th></tr>
+          </thead>
+          <tbody id="recordsTable"></tbody>
+        </table>
+      </div>
+
+      <div id="studentPage" class="hidden">
+        <h2>Просмотр оценки</h2>
+        <div class="join-container">
+          <a href="https://t.me/+fdGMA-3ZAq9hYjli" target="_blank" class="join-link">Присоединиться к уроку</a>
+        </div>
+        <div>
+          <label for="lookupName">Введите ваше имя</label>
+          <input type="text" id="lookupName" />
+          <button id="lookupBtn">Показать</button>
+        </div>
+        <div id="lookupResult" style="margin-top:20px;"></div>
+      </div>
+
+      <div id="directorPage" class="hidden">
+        <h2>Отчёт для директора</h2>
+        <table>
+          <thead>
+            <tr><th>Ученик</th><th>Оценка</th><th>Домашнее задание</th></tr>
+          </thead>
+          <tbody id="directorTable"></tbody>
+        </table>
+        <button id="exportBtn">Экспорт в CSV</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const usersKey = 'users';
+    const recordsKey = 'records';
+    function getUsers() { return JSON.parse(localStorage.getItem(usersKey) || '[]'); }
+    function saveUsers(users) { localStorage.setItem(usersKey, JSON.stringify(users)); }
+    function getRecords() { return JSON.parse(localStorage.getItem(recordsKey) || '[]'); }
+    function saveRecords(records) { localStorage.setItem(recordsKey, JSON.stringify(records)); }
+
+    const authForm = document.getElementById('authForm');
+    const authPage = document.getElementById('authPage');
+    const mainPage = document.getElementById('mainPage');
+    const authError = document.getElementById('authError');
+    let currentUser = null;
+
+    authForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const role = document.getElementById('userRole').value;
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const users = getUsers();
+      let user = users.find(u => u.username === username && u.role === role);
+      if (!user) { user = { username, password, role }; users.push(user); saveUsers(users); }
+      else if (user.password !== password) { authError.textContent = 'Неверный пароль'; return; }
+      currentUser = user;
+      authPage.classList.add('hidden');
+      mainPage.classList.remove('hidden');
+      selectTab(role);
+    });
+
+    function selectTab(role) {
+      document.getElementById('teacherTab').classList.toggle('hidden', role !== 'teacher');
+      document.getElementById('studentTab').classList.toggle('hidden', role !== 'student');
+      document.getElementById('directorTab').classList.toggle('hidden', role !== 'director');
+      document.getElementById('teacherPage').classList.toggle('hidden', role !== 'teacher');
+      document.getElementById('studentPage').classList.toggle('hidden', role !== 'student');
+      document.getElementById('directorPage').classList.toggle('hidden', role !== 'director');
+      if (role === 'teacher') initTeacher();
+      if (role === 'student') initStudent();
+      if (role === 'director') initDirector();
+    }
+
+    function initTeacher() {
+      renderTable();
+      document.getElementById('teacherForm').addEventListener('submit', e => {
+        e.preventDefault();
+        const name = document.getElementById('studentName').value;
+        const grade = document.getElementById('grade').value;
+        const homework = document.getElementById('homework').value;
+        const records = getRecords();
+        records.push({ name, grade, homework });
+        saveRecords(records);
+        renderTable();
+        e.target.reset();
+      });
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('recordsTable');
+      tbody.innerHTML = '';
+      getRecords().forEach(r => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${r.name}</td><td>${r.grade}</td><td>${r.homework}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function initStudent() {
+      document.getElementById('lookupBtn').addEventListener('click', () => {
+        const name = document.getElementById('lookupName').value.trim();
+        const r = getRecords().find(r => r.name.toLowerCase() === name.toLowerCase());
+        document.getElementById('lookupResult').textContent = r ? 
+          `Оценка: ${r.grade}, Домашка: ${r.homework}` : 
+          'Запись не найдена';
+      });
+    }
+
+    function initDirector() {
+      const tbody = document.getElementById('directorTable');
+      tbody.innerHTML = '';
+      getRecords().forEach(r => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${r.name}</td><td>${r.grade}</td><td>${r.homework}</td>`;
+        tbody.appendChild(tr);
+      });
+      document.getElementById('exportBtn').addEventListener('click', () => {
+        const csvContent = 'data:text/csv;charset=utf-8,' +
+          ['Ученик,Оценка,Домашнее задание',
+            ...getRecords().map(r => `${r.name},${r.grade},${r.homework}`)
+          ].join('\n');
+        const link = document.createElement('a');
+        link.setAttribute('href', encodeURI(csvContent));
+        link.setAttribute('download', 'report.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      });
+    }
+  </script>
+</body>
+</html>
